@@ -12,11 +12,15 @@ class FilterChan:
         self._fsc = 3 * fc
         self._tau1 = self._R_BB * self._C_unit * (8 * self._N_CBB) / (8 + self._N_CBB)
         self._tau2 = self._R_BB * self._C_unit * (8 * (self._N_CBB + 1)) / (8 + (self._N_CBB + 1))
-        # self._pulse_width = 1. / fc / self._N - self._t_non_overlap  # in time(seconds)
         self._pulse_width = (1. / (12 * fc)) - self._t_non_overlap  # in time(seconds)
 
     def generate_subband(self, signal, fs):
-        # subband = np.zeros(signal.shape)
+        """
+        Generates the filtered signal for a single channel
+        :param signal:
+        :param fs: sample rate. Assumption here is that the signal has been sufficiently upsampled before calling this function
+        :return:
+        """
         # signal = cast(signal, 'double')  # if signal was read as an integer
         samples = np.arange(signal.shape[0])
         # create differential input
@@ -168,10 +172,22 @@ class FilterBank:
             self._filters.append(FilterChan(f, n))
 
     def generate_subbands(self, signal, fs):
+        fs_resamp = fs if fs > self._fc[-1] * 24 else self._fc[-1] * 24 # resample only if needed
+        t = np.arange(len(signal)) / fs
+        t_resamp = np.arange(round(len(signal) * (fs_resamp / fs))) / fs_resamp
+        signal_resamp = np.interp(t_resamp, t, signal) # might be good to check if other interpolations work better
+        # subbands_resamp = np.zeros((signal_resamp.shape[0], len(self._filters)))
         subbands = np.zeros((signal.shape[0], len(self._filters)))
         for i, filt in enumerate(self._filters):
-            subbands[:, i] = filt.generate_subband(signal, fs)
+            # subbands_resamp[:, i] = filt.generate_subband(signal_resamp, fs_resamp)
+            subbands_resamp = filt.generate_subband(signal_resamp, fs_resamp)
+            subbands[:, i] = np.interp(t, t_resamp, subbands_resamp)  # resample back to original fs
         return subbands
+
+    def channel_energies(self, signal, fs):
+        subbands = self.generate_subbands(signal, fs)
+        energies = np.sum(np.square(subbands),0) / subbands.shape[0]
+        return energies
 
 
 class A2IAFE:

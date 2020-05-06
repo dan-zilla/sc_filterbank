@@ -22,7 +22,9 @@ tin,input_sound = sc_filterbank.generate_tone(A, fc[chan], ftone, fs, 10)
 
 # scfb = sc_filterbank.FilterBank(fc[chan:chan+2], ncbb[chan:chan+2])
 scfb = sc_filterbank.FilterBank(fc, ncbb)
-subbands = scfb.generate_subbands(input_sound, fs)
+# subbands = scfb.generate_subbands(input_sound, fs)
+energies = scfb.channel_energies(input_sound, fs)
 
-plt.plot(tin, subbands)
+# plt.plot(tin, subbands)
+plt.plot(fc, energies)
 plt.show()
