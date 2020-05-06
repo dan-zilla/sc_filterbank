@@ -1,0 +1,34 @@
+## ***************************************************************************
+## * BACKENDS                                                                *
+## ***************************************************************************
+## The default backend.  If you omit this parameter, the first working
+## backend from the following list is used:
+##     MacOSX Qt5Agg Qt4Agg Gtk3Agg TkAgg WxAgg Agg
+## Other choices include:
+##     Qt5Cairo Qt4Cairo GTK3Cairo TkCairo WxCairo Cairo Wx
+##     PS PDF SVG Template
+## You can also deploy your own backend outside of matplotlib by referring to
+## the module name (which must be in the PYTHONPATH) as 'module://my_backend'.
+backend : MacOSX
+
+## The port to use for the web server in the WebAgg backend.
+#webagg.port : 8988
+
+## The address on which the WebAgg web server should be reachable
+#webagg.address : 127.0.0.1
+
+## If webagg.port is unavailable, a number of other random ports will
+## be tried until one that is available is found.
+#webagg.port_retries : 50
+
+## When True, open the webbrowser to the plot that is shown
+#webagg.open_in_browser : True
+
+## If you are running pyplot inside a GUI and your backend choice
+## conflicts, we will automatically try to find a compatible one for
+## you if backend_fallback is True
+#backend_fallback : True
+
+interactive : True
+#toolbar     : toolbar2  ## {None, toolbar2}
+#timezone    : UTC       ## a pytz timezone string, e.g., US/Central or Europe/Paris
