@@ -7,7 +7,7 @@ matplotlib.use('MacOSX')
 matplotlib.interactive(True)
 plt.ion()
 
-fs = 4*16e3 # sample rate
+fs = 2*16e3 # sample rate
 
 afe = sc_filterbank.A2IAFE()
 fc, frc, ncbb, ntot = afe.clkgen_freq_calc()
@@ -23,8 +23,12 @@ tin,input_sound = sc_filterbank.generate_tone(A, fc[chan], ftone, fs, 10)
 # scfb = sc_filterbank.FilterBank(fc[chan:chan+2], ncbb[chan:chan+2])
 scfb = sc_filterbank.FilterBank(fc, ncbb)
 # subbands = scfb.generate_subbands(input_sound, fs)
-energies = scfb.channel_energies(input_sound, fs)
+# energies = scfb.channel_energies(input_sound, fs)
+subbands = afe.subbands(input_sound, fs)
+energies = afe.energies(input_sound, fs)
 
-# plt.plot(tin, subbands)
+plt.figure()
+plt.plot(tin, subbands)
+plt.figure()
 plt.plot(fc, energies)
 plt.show()

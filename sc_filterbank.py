@@ -206,6 +206,8 @@ class A2IAFE:
         self._npath = 4
         self._ndiv = ndiv
         self._nlcm = np.lcm(self._nsc,self._npath) # clock to each filter needs to be divisible by N and switch cap freq multiple
+        fc, frc, ncbb, ntot = self.clkgen_freq_calc()
+        self._filterbank = FilterBank(fc, ncbb)
 
     # Calculate resulting channel frequencies from implemented values
     def clkgen_freq_calc(self):
@@ -222,6 +224,12 @@ class A2IAFE:
         fc = fout[:-1]/self._nlcm
 
         return fc, frc, self._ncap, ntot
+
+    def energies(self, signal, fs):
+        return self._filterbank.channel_energies(signal, fs)
+
+    def subbands(self, signal, fs):
+        return self._filterbank.generate_subbands(signal, fs)
 
 
 def generate_tone(a, fc, ftone, fs, maxcycle=1000):
