@@ -19,3 +19,8 @@ subbands = afe.subbands(input_signal, fs)
 # energies = [,32] numpy array
 energies = afe.energies(input_signal, fs)
 ```
+Additional usage examples for customizing channel frequencies, bandwidths and number of channels are found in
+```python
+tb_filterbank.py
+tb_channel.py
+```
