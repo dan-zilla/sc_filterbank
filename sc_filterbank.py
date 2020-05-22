@@ -178,8 +178,7 @@ class FilterBank:
     
 
     # I think this needs to be static for multiprocessing to work
-    @staticmethod
-    def generate_single_subband(signal, fs, filt):
+    def generate_single_subband(self, signal, fs, filt):
         """Filter signal with sample rate fs using FilterChan filt.
         
         Used here for multiprocessing capability. 
