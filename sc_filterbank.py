@@ -1,6 +1,7 @@
 import numpy as np
 from fractions import Fraction
-
+from multiprocessing import Pool
+from functools import partial
 
 class FilterChan:
     def __init__(self, fc, n_cbb):
@@ -9,7 +10,8 @@ class FilterChan:
         self._C_unit = 4.2e-12  # from chip implementation
         self._R_BB = 1 / (15e3 * self._C_unit)  # from chip TCAS sim
         self._N_CBB = n_cbb
-        self._fsc = 3 * fc
+        # self._fsc = 3 * fc
+        self.fc = fc
         self._tau1 = self._R_BB * self._C_unit * (8 * self._N_CBB) / (8 + self._N_CBB)
         self._tau2 = self._R_BB * self._C_unit * (8 * (self._N_CBB + 1)) / (8 + (self._N_CBB + 1))
         self._pulse_width = (1. / (12 * fc)) - self._t_non_overlap  # in time(seconds)
@@ -164,25 +166,68 @@ class FilterChan:
 
 
 class FilterBank:
-    def __init__(self, fc, n_cbb):
+    def __init__(self, fc, n_cbb, num_workers=1):
         self._fc = fc
         self._n_cbb = n_cbb
         self._filters = []
         for i, (f, n) in enumerate(zip(fc, n_cbb)):
             self._filters.append(FilterChan(f, n))
+        # for multiprocessing
+        self._num_workers = num_workers
+        self._use_multiproc = num_workers > 1
+    
 
-    def generate_subbands(self, signal, fs):
-        fs_resamp = fs if fs > self._fc[-1] * 24 else self._fc[-1] * 24 # resample only if needed
+    # I think this needs to be static for multiprocessing to work
+    @staticmethod
+    def generate_single_subband(signal, fs, filt):
+        """Filter signal with sample rate fs using FilterChan filt.
+        
+        Used here for multiprocessing capability. 
+        Arguments:
+            signal {numpy.array, dtype=float} -- [description]
+            fs {float} -- sample rate
+            filt {FilterChan} -- [description]
+
+        Returns:
+            numpy.array -- filtered output
+        """
+        # decide if we are going to upsample
+        fs_resamp = fs if fs > filt.fc * 24 else filt.fc * 24
         t = np.arange(len(signal)) / fs
         t_resamp = np.arange(round(len(signal) * (fs_resamp / fs))) / fs_resamp
-        signal_resamp = np.interp(t_resamp, t, signal) # might be good to check if other interpolations work better
-        # subbands_resamp = np.zeros((signal_resamp.shape[0], len(self._filters)))
-        subbands = np.zeros((signal.shape[0], len(self._filters)))
-        for i, filt in enumerate(self._filters):
-            # subbands_resamp[:, i] = filt.generate_subband(signal_resamp, fs_resamp)
-            subbands_resamp = filt.generate_subband(signal_resamp, fs_resamp)
-            subbands[:, i] = np.interp(t, t_resamp, subbands_resamp)  # resample back to original fs
+        # upsample
+        signal_resamp = np.interp(t_resamp, t, signal)
+        # filter
+        subband_resamp = filt.generate_subband(signal_resamp, fs_resamp)
+        # downsample and return
+        return np.interp(t, t_resamp, subband_resamp)
+
+    def generate_subbands(self, signal, fs):
+        if self._use_multiproc:
+            filt = partial(self.generate_single_subband, signal, fs)
+            # this is like parfor in Matlab. Filtered signals are returned in a list which we convert to an array
+            with Pool(processes=self._num_workers) as pool:
+                outs = pool.map(filt, self._filters)
+            subbands = np.transpose(np.array(outs))
+        else:
+            subbands = np.zeros((signal.shape[0], len(self._filters)))
+            for i, filt in enumerate(self._filters):
+                subbands[:, i] = self.generate_single_subband(signal, fs, filt) 
         return subbands
+
+    # original generate_subbands function before multiprocessing was used...leave commented out
+    # def generate_subbands(self, signal, fs):
+    #     fs_resamp = fs if fs > self._fc[-1] * 24 else self._fc[-1] * 24 # resample only if needed
+    #     t = np.arange(len(signal)) / fs
+    #     t_resamp = np.arange(round(len(signal) * (fs_resamp / fs))) / fs_resamp
+    #     signal_resamp = np.interp(t_resamp, t, signal) # might be good to check if other interpolations work better
+    #     # subbands_resamp = np.zeros((signal_resamp.shape[0], len(self._filters)))
+    #     subbands = np.zeros((signal.shape[0], len(self._filters)))
+    #     for i, filt in enumerate(self._filters):
+    #         # subbands_resamp[:, i] = filt.generate_subband(signal_resamp, fs_resamp)
+    #         subbands_resamp = filt.generate_subband(signal_resamp, fs_resamp)
+    #         subbands[:, i] = np.interp(t, t_resamp, subbands_resamp)  # resample back to original fs
+    #     return subbands
 
     def channel_energies(self, signal, fs):
         subbands = self.generate_subbands(signal, fs)
@@ -191,7 +236,7 @@ class FilterBank:
 
 
 class A2IAFE:
-    def __init__(self, fclk=510e3, idx_in=None, ncap=None, ndiv=None):
+    def __init__(self, fclk=510e3, idx_in=None, ncap=None, ndiv=None, num_workers=1):
         if idx_in is None:
             idx_in = list(reversed([31,31,31,31,31,31,31,29,28,27,26,25,23,26,25,24,19,24,17,16,15,14,15,21,10,9,12,6,11,3,4,2]))
         if ncap is None:
@@ -207,7 +252,10 @@ class A2IAFE:
         self._ndiv = ndiv
         self._nlcm = np.lcm(self._nsc,self._npath) # clock to each filter needs to be divisible by N and switch cap freq multiple
         fc, frc, ncbb, ntot = self.clkgen_freq_calc()
-        self._filterbank = FilterBank(fc, ncbb)
+        self._filterbank = FilterBank(fc, ncbb, num_workers=num_workers)
+        # for multiprocessing
+        self._num_workers = num_workers
+        self._use_multiproc = num_workers > 1
 
     # Calculate resulting channel frequencies from implemented values
     def clkgen_freq_calc(self):
@@ -225,11 +273,12 @@ class A2IAFE:
 
         return fc, frc, self._ncap, ntot
 
-    def energies(self, signal, fs):
-        return self._filterbank.channel_energies(signal, fs)
-
     def subbands(self, signal, fs):
         return self._filterbank.generate_subbands(signal, fs)
+ 
+    def energies(self, signal, fs):
+        return self._filterbank.channel_energies(signal, fs)
+        # return self._filterbank.subbands2energies(self.subbands(signal, fs))
 
 
 def generate_tone(a, fc, ftone, fs, maxcycle=1000):
