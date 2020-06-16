@@ -16,7 +16,7 @@ class FilterChan:
         self._tau2 = self._R_BB * self._C_unit * (8 * (self._N_CBB + 1)) / (8 + (self._N_CBB + 1))
         self._pulse_width = (1. / (12 * fc)) - self._t_non_overlap  # in time(seconds)
 
-    def generate_subband(self, signal, fs):
+    def generate_subband(self, signal, fs, debug=False):
         """
         Generates the filtered signal for a single channel
         :param signal:
@@ -146,21 +146,27 @@ class FilterChan:
         subband = vo[0, :] - vo[1, :]
 
         # debug
-        # import matplotlib.pyplot as plt
-        # LLIM = 0
-        # RLIM = 0.01
-        # plt.subplot(4, 1, 1)
-        # plt.plot(time, signal_p, time, signal_n)
-        # plt.gca().set_xlim(left=LLIM, right=RLIM)
-        # plt.subplot(4, 1, 2)
-        # plt.plot(time, np.transpose(vo))
-        # plt.gca().set_xlim(left=LLIM, right=RLIM)
-        # plt.subplot(4, 1, 3)
-        # plt.plot(time, state,time, phi_sb_sel, time, phi_sc)
-        # plt.gca().set_xlim(left=LLIM, right=RLIM)
-        # plt.subplot(4, 1, 4)
-        # plt.plot(time, np.transpose(vcsb))
-        # plt.gca().set_xlim(left=LLIM, right=RLIM)
+        if debug:
+            import matplotlib.pyplot as plt
+            LLIM = 0
+            RLIM = 0.01
+            TOPLIM = 0.15
+            BOTLIM = -0.15
+            plt.figure()
+            plt.subplot(4, 1, 1)
+            plt.plot(time, signal_p, time, signal_n)
+            plt.gca().set_xlim(left=LLIM, right=RLIM)
+            plt.subplot(4, 1, 2)
+            plt.plot(time, np.transpose(vo))
+            plt.gca().set_xlim(left=LLIM, right=RLIM)
+            plt.subplot(4, 1, 3)
+            plt.plot(time, np.transpose(vcsb))
+            plt.gca().set_xlim(left=LLIM, right=RLIM)
+            plt.gca().set_ylim(BOTLIM, TOPLIM)
+            plt.subplot(4, 1, 4)
+            plt.plot(time, state/100, time, phi_sb_sel/100, time, phi_sc/100)
+            plt.gca().set_xlim(left=LLIM, right=RLIM)
+            plt.gca().set_ylim(BOTLIM, TOPLIM)
 
         return subband
 
